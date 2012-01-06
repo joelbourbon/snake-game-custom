@@ -63,7 +63,7 @@
       this.DrawingZone.Size = new System.Drawing.Size(660, 660);
       this.DrawingZone.TabIndex = 0;
       this.DrawingZone.TabStop = false;
-      this.DrawingZone.Paint += new System.Windows.Forms.PaintEventHandler(this.pictureBox1_Paint);
+      this.DrawingZone.Paint += new System.Windows.Forms.PaintEventHandler(this.DrawingZone_Paint);
       // 
       // numericUpDown_Speed
       // 
@@ -277,7 +277,7 @@
       this.Name = "MainWindow";
       this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Hide;
       this.Text = "Snake Game";
-      this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.Form1_KeyDown);
+      this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.MainWindow_KeyDown);
       ((System.ComponentModel.ISupportInitialize)(this.DrawingZone)).EndInit();
       ((System.ComponentModel.ISupportInitialize)(this.numericUpDown_Speed)).EndInit();
       this.panel1.ResumeLayout(false);
