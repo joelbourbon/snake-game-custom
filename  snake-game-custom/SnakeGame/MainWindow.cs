@@ -11,10 +11,10 @@ namespace SnakeGame
 {
   public partial class MainWindow : Form
   {
-    private const int INITIALSNAKESIZE = 11;
     public Snake  ActualSnake;
     public bool   isGameOver  = false;   // Bool value to indicate Game Over status   (Not Game Over at the beginning)
     public bool   isPause     = true;    // Bool value to indicate Pause status       (Pause at the beginning)
+    public bool   waitForTick = false;   // Bool value to wait for the next tick before key sensing
 
     public enum Direction
     {
@@ -45,33 +45,38 @@ namespace SnakeGame
 
     public class Treat
     {
-      public Treat(Point iPosition)
+      public Treat(Point iPosition, int iSnakeBoxSize)
       {
         Position = iPosition;
+        Size = new Size(iSnakeBoxSize - 2, iSnakeBoxSize - 2);
       }
 
       public Point Position;
-      public Size Size = new Size(5,5);
+      public Size Size;
     }
 
     public class Snake
     {
+      private PictureBox _drawingRef;
       public int SnakeBoxSize;
       public Direction SnakeDirection = Direction.UP;
       public List<BoxOfSnake> AllBoxes= new List<BoxOfSnake>();
       public Treat ActualTreat;
       public UInt16 Points;
 
-      public Snake(UInt16 iSnakeLength, Point iSnakePosition, int iSnakeBoxSize)
+      public Snake(UInt16 iSnakeLength, ref PictureBox iDrawingRef, int iSnakeBoxSize)
       {
+        _drawingRef = iDrawingRef;
         SnakeBoxSize = iSnakeBoxSize;
+        Point wSnakePosition = new Point(_drawingRef.Width/2, _drawingRef.Height/2);
+
         // Create the initial boxes to form the snake
-        AllBoxes.Insert(0, new BoxOfSnake(iSnakePosition, iSnakeBoxSize));
+        AllBoxes.Insert(0, new BoxOfSnake(wSnakePosition, iSnakeBoxSize));
         for(int i = 0; i < iSnakeLength - 1; i++)
           AppendBox(Direction.DOWN, PositionInSnake.TAIL);
 
         // Init a first treat at a random position
-        ActualTreat = new Treat(RandomPoint(660, SnakeBoxSize));
+        ActualTreat = new Treat(RandomPoint(_drawingRef.Width, SnakeBoxSize), SnakeBoxSize);
       }
 
       private void AppendBox(Direction iDirection, PositionInSnake iPositionInSnake)
@@ -99,20 +104,20 @@ namespace SnakeGame
 
         if (LoopBorder)
         {
-          if (AllBoxes.First().Position.X >= 660)
+          if (AllBoxes.First().Position.X >= _drawingRef.Width)
             AllBoxes.First().Position.X = SnakeBoxSize;
           else if (AllBoxes.First().Position.X <= 0)
-            AllBoxes.First().Position.X = 660 - SnakeBoxSize;
-          else if (AllBoxes.First().Position.Y >= 660)
+            AllBoxes.First().Position.X = _drawingRef.Width - SnakeBoxSize;
+          else if (AllBoxes.First().Position.Y >= _drawingRef.Height)
             AllBoxes.First().Position.Y = SnakeBoxSize;
           else if (AllBoxes.First().Position.Y <= 0)
-            AllBoxes.First().Position.Y = 660 - SnakeBoxSize;
+            AllBoxes.First().Position.Y = _drawingRef.Height - SnakeBoxSize;
         }
 
         if (AllBoxes[0].Position == ActualTreat.Position)
         {
           ++Points;
-          ActualTreat.Position = RandomPoint(660, SnakeBoxSize);
+          ActualTreat.Position = RandomPoint(_drawingRef.Width, SnakeBoxSize);
         }
         else
           AllBoxes.RemoveAt(AllBoxes.Count - 1);
@@ -131,7 +136,9 @@ namespace SnakeGame
           }
 
         // If Outside of box
-        if ((AllBoxes[0].Position.X >= 660 || AllBoxes[0].Position.X <= 0 || AllBoxes[0].Position.Y >= 660 || AllBoxes[0].Position.Y <= 0) && borderDeath)
+        if ( (  AllBoxes[0].Position.X >= _drawingRef.Width || AllBoxes[0].Position.X <= 0
+             || AllBoxes[0].Position.Y >= _drawingRef.Height || AllBoxes[0].Position.Y <= 0) 
+             && borderDeath)
           isGameOver = true;
 
         return isGameOver;
@@ -139,13 +146,20 @@ namespace SnakeGame
 
       public void updateSize(int iSnakeBoxSize)
       {
+        // Calculate the difference in size
         int wDifference = iSnakeBoxSize - SnakeBoxSize;
         SnakeBoxSize = iSnakeBoxSize;
 
+        // Offset the treat by the difference in both directions
+        ActualTreat.Position.Offset(new Point(-wDifference, -wDifference));
+        ActualTreat.Size += new Size(wDifference, wDifference);
+
+        // Offset the first box of the difference in both directions
         AllBoxes[0].Position.Offset(new Point(-wDifference, -wDifference));
         AllBoxes[0].Size = new Size(iSnakeBoxSize, iSnakeBoxSize);
         BoxOfSnake wFirstBoxOfSnake = AllBoxes[0];
 
+        // List the directions of all the next boxes in the actual snake
         var wNextBoxDirection = new List<Direction>();
         Point wLastBoxPosition = AllBoxes[0].Position;
         for (int index = 1; index < AllBoxes.Count; index++)
@@ -162,12 +176,11 @@ namespace SnakeGame
           wLastBoxPosition = box.Position;
         }
 
+        // Clear the list of boxes and repopulate it with the new boxes
         AllBoxes.Clear();
         AllBoxes.Add(wFirstBoxOfSnake);
         foreach (Direction Direction in wNextBoxDirection)
-        {
           AppendBox(Direction, PositionInSnake.TAIL);
-        }
       }
     }
 
@@ -175,15 +188,14 @@ namespace SnakeGame
     {
       InitializeComponent();
 
-      ActualSnake = new Snake(3, new Point(DrawingZone.Width / 2, DrawingZone.Height / 2), INITIALSNAKESIZE);
-      numericUpDownSnakeBoxSize.Value = INITIALSNAKESIZE;
+      ActualSnake = new Snake(3, ref DrawingZone, (int)numericUpDownSnakeBoxSize.Value);
       DrawingZone.BackColor = Color.White;
       numericUpDown_Speed.Value = 25;
       labelGameOver.Visible = false;
       labelPause.Visible = false;
     }
 
-    private void pictureBox1_Paint(object sender, PaintEventArgs e)
+    private void DrawingZone_Paint(object sender, PaintEventArgs e)
     {
       // Get the graphics object 
       Graphics gfx = e.Graphics; 
@@ -198,57 +210,56 @@ namespace SnakeGame
                                            ActualSnake.ActualTreat.Size.Height
                                            ));
 
-      // Print all the snake
+      // Print the snake
       foreach (BoxOfSnake box in ActualSnake.AllBoxes)
         gfx.DrawRectangle(myPen, box.Position.X - ActualSnake.SnakeBoxSize / 2, box.Position.Y - ActualSnake.SnakeBoxSize / 2, box.Size.Width, box.Size.Height);
     }
 
-    protected override bool IsInputKey(Keys keyData)
+    private void MainWindow_KeyDown(object sender, KeyEventArgs e)
     {
-      return false;
-    } // Override IsInputKey to release the hold on the arrows
-
-    private void Form1_KeyDown(object sender, KeyEventArgs e)
-    {
-      switch (e.KeyCode)
-      {
-        case Keys.W:
-          if(ActualSnake.SnakeDirection != Direction.DOWN)
-            ActualSnake.SnakeDirection = Direction.UP;
-          break;
-        case Keys.A:
-          if (ActualSnake.SnakeDirection != Direction.RIGHT)
-            ActualSnake.SnakeDirection = Direction.LEFT;
-          break;
-        case Keys.S:
-          if (ActualSnake.SnakeDirection != Direction.UP)
-            ActualSnake.SnakeDirection = Direction.DOWN;
-          break;
-        case Keys.D:
-          if (ActualSnake.SnakeDirection != Direction.LEFT)
-            ActualSnake.SnakeDirection = Direction.RIGHT;
-          break;
-        case Keys.P:
-          Timer_SpeedOfPlay.Enabled = false;
-          isPause = true;
-          labelPause.Visible = true;
-          break;
-      }
+      bool isNewState = false;
+      if(!waitForTick)
+        switch (e.KeyCode)
+        {
+          case Keys.W:
+            if (ActualSnake.SnakeDirection != Direction.DOWN)
+              ActualSnake.SnakeDirection = Direction.UP;
+            break;
+          case Keys.A:
+            if (ActualSnake.SnakeDirection != Direction.RIGHT)
+              ActualSnake.SnakeDirection = Direction.LEFT;
+            break;
+          case Keys.S:
+            if (ActualSnake.SnakeDirection != Direction.UP)
+              ActualSnake.SnakeDirection = Direction.DOWN;
+            break;
+          case Keys.D:
+            if (ActualSnake.SnakeDirection != Direction.LEFT)
+              ActualSnake.SnakeDirection = Direction.RIGHT;
+            break;
+          case Keys.P:
+            Timer_SpeedOfPlay.Enabled = false;
+            isPause = true;
+            isNewState = true;
+            labelPause.Visible = true;
+            break;
+        }
 
       if (isGameOver)
       {
-        ActualSnake = new Snake(3, new Point(330, 330), (int) numericUpDownSnakeBoxSize.Value);
+        ActualSnake = new Snake(3, ref DrawingZone, (int) numericUpDownSnakeBoxSize.Value);
         labelGameOver.Visible = false;
         isGameOver = false;
         DrawingZone.Refresh();
       }
 
-      else if (isPause)
+      else if (isPause && !isNewState)
       {
         Timer_SpeedOfPlay.Enabled = true;
         labelPause.Visible = false;
         isPause = false;
       }
+      waitForTick = true;
     }
 
     static public Point RandomPoint(int DrawingZoneSize, int SnakeBoxSize)
@@ -262,6 +273,7 @@ namespace SnakeGame
 
     private void Timer_SpeedOfPlay_Tick(object sender, EventArgs e)
     {
+      waitForTick = false;
       ActualSnake.Move(radioButtonBorderDeathOFF.Checked);
       textBox_Score.Text = ActualSnake.Points.ToString();
 
